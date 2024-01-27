@@ -5,9 +5,12 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <std_msgs/msg/int32.h>
+// #include <std_msgs/msg/int32.h>
 #include <mren_interfaces/msg/pico_motor_commands.h>
 #include <mren_interfaces/msg/pico_sensor_output.h>
+#include <mren_interfaces/srv/pico_activate_robot.h>
+
+#include "Robot.h"
 
 #if !defined(MICRO_ROS_TRANSPORT_ARDUINO_SERIAL)
 #error This example is only avaliable for Arduino framework with serial transport.
@@ -15,9 +18,13 @@
 
 rcl_publisher_t publisher;
 rcl_subscription_t subscriber;
-std_msgs__msg__Int32 msg;
+rlc_service_t service;
+// std_msgs__msg__Int32 msg;
 mren_interfaces__msg__PicoMotorCommands motor_commands;
 mren_interfaces__msg__PicoSensorOutput sensor_output;
+mren_interfaces__srv__PicoActivateRobotRequest requestMsg;
+mren_interfaces__srv__PicoActivateRobotResponse responseMsg;
+Robot* robot;
 
 rclc_executor_t executor;
 rclc_support_t support;
@@ -34,15 +41,27 @@ void error_loop() {
     delay(100);
   }
 }
+// Service Callback
+void pico_activate_service_callback(const void* msgin, void* msgout) {
+  mren_interfaces__srv__PicoActivateRobotRequest* requestMsg = (mren_interfaces__srv__PicoActivateRobotRequest*) msgin;
+  mren_interfaces__srv__PicoActivateRobotResponse* responseMsg = (mren_interfaces__srv__PicoActivateRobotResponse*) msgout;
+  robot->activate(msgin->kp, msgin->ki, msgin->kd); // TODO activate the robot
+  if(robot.isActive()) {
+    msgout->activated = true;
+  } else {
+    msgout->activated = false;
+  }
+}
 
 // Subscription Callback
 void pico_motor_commands_callback(const void *msgin) {
-    const mren_interfaces__msg__PicoMotorCommands * msgi = (const mren_interfaces__msg__PicoMotorCommands *)msgin;
+    motor_commands = (const mren_interfaces__msg__PicoMotorCommands) (*msgin);
     // msg.data = msg->data + 1;
-    motor_commands.left_wheel_velocity = msgi->left_wheel_velocity + 1;
-    motor_commands.right_wheel_velocity = msgi->right_wheel_velocity + 2;
-    sensor_output.left_wheel_velocity = motor_commands.left_wheel_velocity;
-    sensor_output.right_wheel_velocity = motor_commands.right_wheel_velocity;
+    robot->setMotorVelocities(motor_commands);
+    // motor_commands.left_wheel_velocity = msgi->left_wheel_velocity + 1;
+    // motor_commands.right_wheel_velocity = msgi->right_wheel_velocity + 2;
+    // sensor_output.left_wheel_velocity = motor_commands.left_wheel_velocity;
+    // sensor_output.right_wheel_velocity = motor_commands.right_wheel_velocity;
     RCSOFTCHECK(rcl_publish(&publisher, &sensor_output, NULL));
 }
 
@@ -50,11 +69,13 @@ void pico_motor_commands_callback(const void *msgin) {
 void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   if (timer != NULL) {
+    robot->takeReading(sensor_output);
     RCSOFTCHECK(rcl_publish(&publisher, &sensor_output, NULL));
   }
 }
 
 void setup() {
+  // robot = new Robot() // TODO add values BUG we don't free this but idc
   // Configure serial transport
   Serial.begin(115200);
   set_microros_serial_transports(Serial);
@@ -82,6 +103,13 @@ void setup() {
   	ROSIDL_GET_MSG_TYPE_SUPPORT(mren_interfaces, msg, PicoMotorCommands),
   	"pico_motor_commands"));
 
+  // Create service
+  RCCHECK(rclc_service_init_default(
+    &service,
+    &node,
+    ROSIDL_GET_SRV_TYPE_SUPPORT(mren_interfaces, srv, PicoActivateRobot),
+    "pico_activate"
+  ));
   // create timer,
   const unsigned int timer_timeout = 1000;
   RCCHECK(rclc_timer_init_default(
@@ -91,15 +119,18 @@ void setup() {
     timer_callback));
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
-  //RCCHECK(rclc_executor_add_timer(&executor, &timer));
-
+  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator)); // 3 is for 3 things it can keep track of
+  RCCHECK(rclc_executor_add_timer(&executor, &timer));
+  // Add service to the executor
+  RCCHECK(rclc_executor_add_service(
+    &executor, &serive, &requestMsg, &responseMsg, pico_activate_service_callback
+  ));
   // Add subscription to the executor
   RCCHECK(rclc_executor_add_subscription(
     &executor, &subscriber, &motor_commands,
     &pico_motor_commands_callback, ON_NEW_DATA));
 
-  msg.data = 0;
+  // msg.data = 0;
   sensor_output.left_wheel_velocity = 0;
   sensor_output.right_wheel_velocity = 0;
   sensor_output.proximity_front = 0;
