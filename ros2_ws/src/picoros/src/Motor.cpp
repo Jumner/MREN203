@@ -30,7 +30,7 @@ void Motor::setPoint(double targetVel) {
     targetVelocity = targetVel;
 }
 void Motor::run(int signedPWM) {
-    if(state == Inactive) { // TODO safety check the second
+    if(!isActive()) { // TODO safety check the second
         digitalWrite(enable, 0);
         return;
     }
