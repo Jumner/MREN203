@@ -10,10 +10,13 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(mren_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(robot_driver src/robot_driver.cpp)
-ament_target_dependencies(robot_driver rclcpp mren_interfaces std_msgs geometry_msgs)
-
+ament_target_dependencies(robot_driver rclcpp mren_interfaces std_msgs geometry_msgs nav_msgs tf2 tf2_ros)
+ 
 install(TARGETS
 	robot_driver
 	DESTINATION lib/${PROJECT_NAME})
