@@ -1,7 +1,5 @@
 float64 left_wheel_velocity
 float64 right_wheel_velocity
-float64 left_PID_period
-float64 right_PID_period
 float64 proximity_front
 float64 proximity_left
 float64 proximity_right
