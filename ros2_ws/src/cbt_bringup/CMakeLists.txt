@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(mren_interfaces)
+project(cbt_bringup)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,24 +7,14 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
-
-set(msg_files 
-  "msg/Acceleration3.msg"
-  "msg/AngularRate3.msg"
-  "msg/PicoMotorCommands.msg"
-  "msg/PicoSensorOutput.msg"
-)
-set(srv_files
-  "srv/PicoActivateRobot.srv"
-)
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files}
-  ${srv_files}
-)
-rosidl_get_typesupport_target(cpp_typesupport_target
-  ${PROJECT_NAME} rosidl_typesupport_cpp)
-ament_export_dependencies(rosidl_default_runtime)
+find_package(sllidar_ros2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(robot_driver REQUIRED)
+find_package(nav2_bringup REQUIRED)
+find_package(slam_toolbox REQUIRED)
+install(DIRECTORY
+	launch
+	DESTINATION share/${PROJECT_NAME})
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)

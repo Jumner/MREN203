@@ -5,6 +5,7 @@ from math import sin, cos, pi
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import TransformStamped
+from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
 from nav_msgs.msg import Odometry
 
@@ -32,7 +33,7 @@ class Motor():
         GPIO.setup(self.encoder_b, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
         # PWM
-        self.pwm = GPIO.PWM(self.enable, 60)
+        self.pwm = GPIO.PWM(self.enable, 100)
         self.pwm.start(0)
 
         # Interrupt
@@ -79,11 +80,13 @@ class Motor():
 class RobotDriver(Node):
     def __init__(self):
         super().__init__('robot_driver')
+
+        self.halt_subscription_ =self.create_subscription(String,'halt',self.halt_callback,10)
         self.odom_publisher_ = self.create_publisher(Odometry, 'odom', 10)
         self.odom_broadcaster_ = TransformBroadcaster(self)
         self.cmd_vel_subscription_ = self.create_subscription(
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
-        self.timer = self.create_timer(0.01, self.update)
+        self.timer = self.create_timer(1/20, self.update)
         self.width = 0.275
         self.then = self.get_clock().now()
         self.leftMotor = Motor(13, 26, 19, 17, 27)
@@ -93,11 +96,18 @@ class RobotDriver(Node):
         self.th = 0
         self.vx = 0
         self.vth = 0
+        self.halt = False
+    def halt_callback(self, msg):
+        self.halt = msg.data == "not okay"
 
     def cmd_vel_callback(self, msg):
         delta = msg.angular.z * self.width
-        self.leftMotor.target = msg.linear.x - delta
-        self.rightMotor.target = msg.linear.x + delta
+        if(self.halt):
+            self.leftMotor.target = 0
+            self.rightMotor.target = 0
+        else:
+            self.leftMotor.target = msg.linear.x - delta
+            self.rightMotor.target = msg.linear.x + delta
 
     def update(self):
         elapsed, now = self.cycle_setup()
