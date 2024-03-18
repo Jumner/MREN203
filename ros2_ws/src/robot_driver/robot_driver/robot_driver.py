@@ -34,10 +34,10 @@ class Motor():
         self.pwm.start(0)
 
     def pid(self, elapsed, ticks):
-        kp = 0.0
-        ki = 0.15
-        kd = 0.0125
-        meters_per_tick = (1*pi*self.wheel_radius) / (30*100)
+        kp = 1.5
+        ki = 4.0
+        kd = 0.0
+        meters_per_tick = (pi*self.wheel_radius) / (30*100)
 
         difference = (ticks % 4096) - (self.ticks % 4096)
         if (difference > 2048):
@@ -76,6 +76,7 @@ class RobotDriver(Node):
         super().__init__('robot_driver')
 
         self.odom_publisher_ = self.create_publisher(Odometry, 'odom', 10)
+        self.vel_publisher_ = self.create_publisher(Twist, 'vel', 10)
         self.odom_broadcaster_ = TransformBroadcaster(self)
         self.cmd_vel_subscription_ = self.create_subscription(
             Twist, 'cmd_vel', self.cmd_vel_callback, 10)
@@ -98,10 +99,10 @@ class RobotDriver(Node):
             self.rightMotor.target = 0
         else:
             linear = max(min(msg.linear.x, 0.25), -0.25)
-            delta = max(min(msg.angular.z, 0.5),-0.5) * self.width
-            msg.angular
-            self.leftMotor.target = msg.linear.x - delta
-            self.rightMotor.target = msg.linear.x + delta
+            delta = max(min(msg.angular.z, 0.5), -0.5) * self.width / 2
+            
+            self.leftMotor.target = linear - delta
+            self.rightMotor.target = linear + delta
 
     def update(self):
         elapsed, now = self.cycle_setup()
@@ -128,6 +129,12 @@ class RobotDriver(Node):
 
         # PUBLISHING
         self.publish_odometry(now)
+
+        # Create twist
+        twist = Twist()
+        twist.linear.x = (self.leftMotor.velocity + self.rightMotor.velocity) / 2
+        twist.angular.z = (self.leftMotor.velocity - self.rightMotor.velocity) / self.width
+        self.vel_publisher_.publish(twist)
 
     def cycle_setup(self):
         now = self.get_clock().now()

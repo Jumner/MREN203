@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(tf2_ros REQUIRED)
 #find_package(robot_driver REQUIRED)
 find_package(nav2_bringup REQUIRED)
+find_package(slam_toolbox REQUIRED)
 #find_package(slam_toolbox REQUIRED)
 install(DIRECTORY
 	launch
