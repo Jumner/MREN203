@@ -14,12 +14,13 @@
 
 import rclpy
 import numpy as np
+import math
 from rclpy.node import Node
 import cv2
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 import pathlib
-
+from geometry_msgs.msg import Pose
 from std_msgs.msg import String
 
 
@@ -60,17 +61,56 @@ class MinimalPublisher(Node):
 class CameraSubscriber(Node):
     def __init__(self):
         super().__init__('camera_subscriber')
-        self.subscription = self.create_subscription(
-            Image, 
-            'camera/image',
-            self.listener_callback,
-            10)
+        self.subscription = self.create_subscription(Image, 'camera/image',self.listener_callback,10)
         self.subscription # prevent unused variable warning
+        self.subscription =self.create_subscription(Pose, 'pose',self.pose_callback,10)
+
+        self.pose
+        self.image
+        self.pose_array = np.array([])
+        self.frame_count = 0
+
+        self.pose_x
+        self.pose_y
+        self.pose_theta
+        self.q_w
+        self.q_z
+        self.q_x
+        self.q_y
+        self.t3
+        self.t4
+        self.yaw_z
 
     def listener_callback(self, img_msg): # Activates whenever and image is recieved/taken
-        pass
+        self.image = img_msg
+
+        cv2.imwrite('/images'{frame_count}'.jpg', self.cap)
+
+        # Gather all required pose data
+        self.pose_x = self.pose.position.x
+        self.pose_y = self.pose.position.y
+        self.q_w = self.pose.orientation.w
+        self.q_z = self.pose.orientation.z
+        self.q_x = self.pose.orientation.x
+        self.q_y = self.pose.orientation.y
+        
+        # Retrieve Yaw
+        self.t3 = 2.0 * (self.q_w * self.q_z + self.q_x * self.q_y)
+        self.t4 = 1.0 - 2.0 * (self.q_y * self.q_y + self.q_z * self.q_z)
+        self.yaw_z = math.atan2(t3, t4)
+        self.pose_theta = self.yaw_z
+
+        self.
 
 
+
+
+
+
+        frame_count = frame_count+1
+
+    def pose_callback(self, pose_msg): # Activates whenever a pose is recieved
+        self.pose = pose_msg
 
 
 
