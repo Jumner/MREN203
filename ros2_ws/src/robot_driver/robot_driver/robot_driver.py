@@ -91,6 +91,7 @@ class RobotDriver(Node):
         self.vth = 0
         self.halt = False
         self.serial = serial.Serial('/dev/serial/by-id/usb-ATMEL_mEDBG_CMSIS-DAP_8BF897446D846781B338-if01', 9600)
+        self.serial.readline()
 
     def cmd_vel_callback(self, msg):
         if (self.halt):
@@ -105,11 +106,12 @@ class RobotDriver(Node):
 
     def update(self):
         # Read Serial
-        prox_0, prox_1, left_ticks, right_ticks = ""
+        prox_0, prox_1, left_ticks, right_ticks = "", "", "", ""
         while True:
             try:
                 line = self.serial.readline().decode('utf-8').strip()
-                prox_0, prox_1, left_ticks, right_ticks = line.split(',')
+                prox_0, prox_1, left_ticks, right_ticks, vth = line.split(',')
+                self.vth = float(vth) * pi / 180.0
                 break
             except Exception as e:
                 self.get_logger().warning(f'Serial Read failed: {e}')
@@ -182,7 +184,9 @@ class RobotDriver(Node):
 
     def calculate_odometry(self, elapsed):
         self.vx = (self.leftMotor.velocity + self.rightMotor.velocity) / 2
-        self.vth = (self.rightMotor.velocity - self.leftMotor.velocity) / self.width
+        vth = (self.rightMotor.velocity - self.leftMotor.velocity) / self.width
+        if (vth == 0):
+            self.vth = 0.0
 
         self.th += self.vth * elapsed
         self.x += cos(self.th) * self.vx * elapsed

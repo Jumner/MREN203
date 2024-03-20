@@ -8,20 +8,25 @@ from geometry_msgs.msg import Pose, PoseStamped, Quaternion, PoseWithCovarianceS
 class Guidance(Node):
     def __init__(self):
         super().__init__('cbt_guidance')
-        self.subscription = self.create_subscription(OccupancyGrid, '/global_costmap/costmap', self.map_callback, 10)
+        self.cost_subscription = self.create_subscription(OccupancyGrid, '/global_costmap/costmap', self.costmap_callback, 10)
+        self.map_subscription = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         self.subscription = self.create_subscription(PoseWithCovarianceStamped, '/pose', self.pose_callback, 10)
         self.publisher = self.create_publisher(PoseStamped, 'goal_pose', 10)
         self.map = OccupancyGrid()
         self.pose = Pose()
         self.last_goal = (0.0, 0.0, 0.0)
+        self.costmap = OccupancyGrid()
 
     def pose_callback(self, msg):
         self.pose = msg.pose.pose
 
+    def costmap_callback(self, msg):
+        self.costmap = msg
+
     def map_callback(self, msg):
-        if (self.map.data == msg.data):
-            self.map = msg
-            return
+        self.map = msg
+        #if (self.map.data == msg.data):
+        #    return
 
         x, y, yaw = self.pickPose(msg)
 
@@ -60,6 +65,10 @@ class Guidance(Node):
                     continue # ignore squares with no known neighbours, squares bordering walls, and isolated unknown squares
                 px = msg.info.origin.position.x + x * resolution
                 py = msg.info.origin.position.y + y * resolution
+                cmx = int((px - self.costmap.info.origin.position.x) / self.costmap.info.resolution)
+                cmy = int((py - self.costmap.info.origin.position.y) / self.costmap.info.resolution)
+                if (self.costmap.data[cmy * self.costmap.info.width + cmx] > 0): # Avoid near walls
+                    continue
                 yaw = 0.0
                 poses.append((px, py, yaw))
         best_cost = ((poses[0][0] - self.last_goal[0]) ** 2 + (poses[0][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x))

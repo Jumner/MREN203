@@ -44,6 +44,8 @@ class CameraDriver(Node):
         self.pose_x = 0
         self.pose_y = 0
         self.pose_theta = 0
+        self.max_radius = 3.0
+        self.angle_threshhold = np.pi/6.0
 
     def timer_callback(self):
         ret, frame = self.cap.read()
@@ -85,13 +87,32 @@ class CameraDriver(Node):
         target_point = target_point.point
         self.get_logger().info(str(self.pose_array))
         self.get_logger().info(str(target_point))
-        filtered_array = list(filter(lambda pose: is_seen(target_point, pose), self.pose_array))
+        filtered_array = list(filter(lambda pose: self.is_seen(target_point, pose), self.pose_array))
         self.get_logger().info(str(filtered_array))
 
+    def is_seen(point, pose):
+        seen = False
+        # Gather target coordinates
+        target_x = target_point.position.x
+        target_y = target_point.position.y
+        # Gather pose data
+        robot_x = pose[1]
+        robot_y = pose[2]
+        robot_theta = pose[3]
+        distance = np.sqrt((target_x - robot_x) ** 2 + (target_y - robot_y) ** 2)
+        # If the point is within the maximum radius
+        if distance <= self.max_radius:
+            # Compute angle between input coordinate and pose
+            angle = np.arctan2(target_y - robot_y, target_x - robot_x)
+            # # Normalize angle to be between -pi and pi
+            angle = np.mod(angle + np.pi, 2 * np.pi) - np.pi
+            # Compute the difference between pose_theta and angle
+            angle_difference = np.abs(angle - robot_theta)
+            # If the point is in the FOV cone
+            if angle_difference <= self.angle_threshold or angle_difference >= (2 * np.pi - self.angle_threshold):
+                seen = True
+        return seen
 
-def is_seen(point, pose):
-    # If a point is seen by a pose
-    return True
 
 def main(args=None):
     rclpy.init(args=args)
