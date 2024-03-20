@@ -24,9 +24,6 @@ from geometry_msgs.msg import Pose, PoseWithCovarianceStamped
 from geometry_msgs.msg import Point, PointStamped
 from std_msgs.msg import String
 
-
-
-
 class CameraDriver(Node):
     def __init__(self):
         super().__init__('camera_driver')
@@ -51,8 +48,8 @@ class CameraDriver(Node):
     def timer_callback(self):
         ret, frame = self.cap.read()
         if frame is None:
-            self.get_logger.warning("failed to read frame")
-            return 
+            self.get_logger().warning("failed to read frame")
+            return
             
         frame = cv2.flip(frame, 1)
         image_name = f'images/{self.frame_count}.jpg'

@@ -13,6 +13,7 @@ class Guidance(Node):
         self.publisher = self.create_publisher(PoseStamped, 'goal_pose', 10)
         self.map = OccupancyGrid()
         self.pose = Pose()
+        self.last_goal = (0.0, 0.0, 0.0)
 
     def pose_callback(self, msg):
         self.pose = msg.pose.pose
@@ -24,19 +25,19 @@ class Guidance(Node):
 
         x, y, yaw = self.pickPose(msg)
 
-        pose = PoseStamped()
-        pose.header.stamp = self.get_clock().now().to_msg()
-        pose.header.frame_id = 'map'
-        q = Quaternion()
-        q.z = sin(yaw / 2)
-        q.w = cos(yaw / 2)
-        pose.pose.position.x = x
-        pose.pose.position.y = y
-        pose.pose.orientation = self.pose.orientation
+        goal_pose = PoseStamped()
+        goal_pose.header.stamp = self.get_clock().now().to_msg()
+        goal_pose.header.frame_id = 'map'
+        # q = Quaternion()
+        # q.z = sin(yaw / 2)
+        # q.w = cos(yaw / 2)
+        goal_pose.pose.position.x = x
+        goal_pose.pose.position.y = y
+        goal_pose.pose.orientation = self.pose.orientation
         
-        self.get_logger().info(str(pose))
+        self.get_logger().info(str(goal_pose))
         # -1 is unknown, 0 is clear, 100 is wall
-        self.publisher.publish(pose)
+        self.publisher.publish(goal_pose)
 
     def pickPose(self, msg):
         poses = []
@@ -61,15 +62,17 @@ class Guidance(Node):
                 py = msg.info.origin.position.y + y * resolution
                 yaw = 0.0
                 poses.append((px, py, yaw))
-        best_cost = ((poses[0][0] - self.pose.position.x) ** 2 + (poses[0][1] - self.pose.position.y) ** 2) * abs(asin(self.pose.orientation.z) + atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x))
+        best_cost = ((poses[0][0] - self.last_goal[0]) ** 2 + (poses[0][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x))
         while len(poses) > 1:
-            cost = ((poses[1][0] - self.pose.position.x) ** 2 + (poses[1][1] - self.pose.position.y) ** 2) * abs(asin(self.pose.orientation.z) + atan2(poses[1][1] - self.pose.position.y, poses[1][0] - self.pose.position.x))
+            cost = ((poses[1][0] - self.last_goal[0]) ** 2 + (poses[1][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[1][1] - self.pose.position.y, poses[1][0] - self.pose.position.x))
             if cost < best_cost:
                 best_cost = cost
                 poses.pop(0)
             else:
                 poses.pop(1)
-        return poses[0]
+        self.get_logger().info(f'\nPose angle: {2*asin(self.pose.orientation.z)}\nPoint angle: {atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x)}')
+        self.last_goal = poses[0]
+        return self.last_goal
 
 def main(args=None):
     rclpy.init(args=args)

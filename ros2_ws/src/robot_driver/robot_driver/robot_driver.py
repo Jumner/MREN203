@@ -6,7 +6,6 @@ from math import sin, cos, pi
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import TransformStamped
-from std_msgs.msg import String
 from tf2_ros import TransformBroadcaster
 from nav_msgs.msg import Odometry
 
@@ -34,8 +33,8 @@ class Motor():
         self.pwm.start(0)
 
     def pid(self, elapsed, ticks):
-        kp = 1.5
-        ki = 4.0
+        kp = 1.0
+        ki = 3.0
         kd = 0.0
         meters_per_tick = (pi*self.wheel_radius) / (30*100)
 
@@ -94,31 +93,38 @@ class RobotDriver(Node):
         self.serial = serial.Serial('/dev/serial/by-id/usb-ATMEL_mEDBG_CMSIS-DAP_8BF897446D846781B338-if01', 9600)
 
     def cmd_vel_callback(self, msg):
-        if(self.halt):
+        if (self.halt):
             self.leftMotor.target = 0
             self.rightMotor.target = 0
         else:
             linear = max(min(msg.linear.x, 0.25), -0.25)
             delta = max(min(msg.angular.z, 0.5), -0.5) * self.width / 2
-            
+
             self.leftMotor.target = linear - delta
             self.rightMotor.target = linear + delta
 
     def update(self):
-        elapsed, now = self.cycle_setup()
         # Read Serial
-        line = self.serial.readline().decode('utf-8').strip()
-        str_val1, str_val2, encoder_L, encoder_R = line.split(',')
-        val1 = int(str_val1)
-        val2 = int(str_val2)
-        #if(val1>400 or val2>400):
+        prox_0, prox_1, left_ticks, right_ticks = ""
+        while True:
+            try:
+                line = self.serial.readline().decode('utf-8').strip()
+                prox_0, prox_1, left_ticks, right_ticks = line.split(',')
+                break
+            except Exception as e:
+                self.get_logger().warning(f'Serial Read failed: {e}')
+
+        # Setup timing
+        elapsed, now = self.cycle_setup()
+        # Handle prox
+        prox_0, prox_1 = int(prox_0), int(prox_1)
+        #if(prox_0>400 or prox_1>400):
         #    self.halt = True
         #    self.leftMotor.target = 0
         #    self.rightMotor.target = 0
         #else:
         #    self.halt = False
-        left_ticks, right_ticks = int(encoder_L), int(encoder_R)
-        self.get_logger().info(f'\nleft ticks:  {left_ticks}\nright_ticks: {right_ticks}\n')
+        left_ticks, right_ticks = int(left_ticks), int(right_ticks)
 
         # PID
         self.leftMotor.pid(elapsed, left_ticks)
@@ -132,8 +138,8 @@ class RobotDriver(Node):
 
         # Create twist
         twist = Twist()
-        twist.linear.x = (self.leftMotor.velocity + self.rightMotor.velocity) / 2
-        twist.angular.z = (self.leftMotor.velocity - self.rightMotor.velocity) / self.width
+        twist.linear.x = self.vx
+        twist.angular.z = self.vth
         self.vel_publisher_.publish(twist)
 
     def cycle_setup(self):
@@ -148,7 +154,7 @@ class RobotDriver(Node):
         quaternion = Quaternion()
         quaternion.x = 0.0
         quaternion.y = 0.0
-        quaternion.z = -sin(self.th / 2)
+        quaternion.z = sin(self.th / 2)
         quaternion.w = cos(self.th / 2)
 
         odom = Odometry()
@@ -159,7 +165,7 @@ class RobotDriver(Node):
         odom.pose.pose.position.y = self.y
         odom.pose.pose.position.z = 0.0
         odom.pose.pose.orientation = quaternion
-        odom.twist.twist.linear.x = -self.vx
+        odom.twist.twist.linear.x = self.vx
         odom.twist.twist.linear.y = 0.0
         odom.twist.twist.angular.z = self.vth
         self.odom_publisher_.publish(odom)
@@ -176,11 +182,11 @@ class RobotDriver(Node):
 
     def calculate_odometry(self, elapsed):
         self.vx = (self.leftMotor.velocity + self.rightMotor.velocity) / 2
-        self.vth = (self.leftMotor.velocity - self.rightMotor.velocity) / self.width
+        self.vth = (self.rightMotor.velocity - self.leftMotor.velocity) / self.width
 
         self.th += self.vth * elapsed
         self.x += cos(self.th) * self.vx * elapsed
-        self.y += -sin(self.th) * self.vx * elapsed
+        self.y += sin(self.th) * self.vx * elapsed
 
 
 def main(args=None):
