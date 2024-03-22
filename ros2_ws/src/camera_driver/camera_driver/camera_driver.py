@@ -14,7 +14,7 @@
 
 import rclpy
 import numpy as np
-import math
+from math import asin, atan2
 from rclpy.node import Node
 import cv2
 from cv_bridge import CvBridge
@@ -44,7 +44,7 @@ class CameraDriver(Node):
         self.pose_x = 0
         self.pose_y = 0
         self.pose_theta = 0
-        self.max_radius = 3.0
+        self.max_radius_squared = 3.0 ** 2
         self.angle_threshhold = np.pi/6.0
 
     def timer_callback(self):
@@ -56,21 +56,15 @@ class CameraDriver(Node):
         frame = cv2.flip(frame, 1)
         image_name = f'images/{self.frame_count}.jpg'
         self.get_logger().info(f'Logging frame: {image_name}')
-        # cv2.imwrite(image_name, frame) TODO
+        # cv2.imwrite(image_name, frame) TODO uncomment but rip storage
+        # TODO add the transform stuff here to set self.pose
 
         # Gather all required pose data
         self.pose_x = self.pose.position.x
         self.pose_y = self.pose.position.y
-        w = self.pose.orientation.w
-        z = self.pose.orientation.z
-        x = self.pose.orientation.x
-        y = self.pose.orientation.y
         
         # Retrieve Yaw
-        t3 = 2.0 * (x * y * z * w)
-        t4 = 1.0 - 2.0 * (y * y + z * z)
-        yaw = math.atan2(t3, t4)
-        self.pose_theta = yaw
+        self.pose_theta = 2*asin(self.pose.orientation.z)
 
         # Put frame in array
         self.pose_array.append((image_name, self.pose_x, self.pose_y, self.pose_theta))
@@ -82,37 +76,41 @@ class CameraDriver(Node):
 
     def pose_callback(self, pose_msg): # Activates whenever a pose is recieved
         self.pose = pose_msg.pose.pose
+        self.get_logger().info(f'Recieved Pose: {str(self.pose)}')
+        # TODO use tf2_ros to query the base_link to map transform to get the current pose at every point
+        # You will need to remove this callback, as the transforms get updated automatically.
 
     def target_callback(self, target_point):
         target_point = target_point.point
         self.get_logger().info(str(self.pose_array))
         self.get_logger().info(str(target_point))
-        filtered_array = list(filter(lambda pose: self.is_seen(target_point, pose), self.pose_array))
+        target_point = [target_point.x, target_point.y]
+        filtered_array = list(map(lambda pose: pose[0], filter(lambda pose: self.is_seen(target_point, pose), self.pose_array)))
         self.get_logger().info(str(filtered_array))
+        # TODO turn filtered_array into video
 
-    def is_seen(point, pose):
-        seen = False
+    def is_seen(self, point, pose):
         # Gather target coordinates
-        target_x = target_point.position.x
-        target_y = target_point.position.y
+        target_x = point[0]
+        target_y = point[1]
         # Gather pose data
         robot_x = pose[1]
         robot_y = pose[2]
-        robot_theta = pose[3]
-        distance = np.sqrt((target_x - robot_x) ** 2 + (target_y - robot_y) ** 2)
-        # If the point is within the maximum radius
-        if distance <= self.max_radius:
-            # Compute angle between input coordinate and pose
-            angle = np.arctan2(target_y - robot_y, target_x - robot_x)
-            # # Normalize angle to be between -pi and pi
-            angle = np.mod(angle + np.pi, 2 * np.pi) - np.pi
-            # Compute the difference between pose_theta and angle
-            angle_difference = np.abs(angle - robot_theta)
-            # If the point is in the FOV cone
-            if angle_difference <= self.angle_threshold or angle_difference >= (2 * np.pi - self.angle_threshold):
-                seen = True
-        return seen
+        distance = (target_x - robot_x) ** 2 + (target_y - robot_y) ** 2
+        # If the point is outside the maximum radius
+        if distance > self.max_radius_squared:
+            return False
 
+        # Compute angle between input coordinate and pose
+        robot_theta = pose[3]
+        angle = atan2(target_y - robot_y, target_x - robot_x)
+        # Compute the difference between pose_theta and angle
+        angle_difference = abs(robot_theta - angle)
+        # If the point is outside the FOV cone
+        if angle_difference > self.angle_threshhold:
+            return False
+
+        return True
 
 def main(args=None):
     rclpy.init(args=args)

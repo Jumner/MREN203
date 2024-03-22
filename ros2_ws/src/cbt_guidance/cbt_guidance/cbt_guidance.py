@@ -72,6 +72,8 @@ class Guidance(Node):
                     continue
                 yaw = 0.0
                 poses.append((px, py, yaw))
+        if (len(poses) == 0):  # Mapping done
+            return (0,0,0) # Return to origin
         best_cost = ((poses[0][0] - self.last_goal[0]) ** 2 + (poses[0][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x))
         while len(poses) > 1:
             cost = ((poses[1][0] - self.last_goal[0]) ** 2 + (poses[1][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[1][1] - self.pose.position.y, poses[1][0] - self.pose.position.x))
