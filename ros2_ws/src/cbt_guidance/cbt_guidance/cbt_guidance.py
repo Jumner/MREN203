@@ -62,12 +62,13 @@ class Guidance(Node):
                 neighbours += h
                 neighbours += v
                 if (neighbours == -4 or neighbours >= 0):
-                    continue # ignore squares with no known neighbours, squares bordering walls, and isolated unknown squares
+                    continue # ignore squares with no known neighbours, and isolated unknown squares
                 px = msg.info.origin.position.x + x * resolution
                 py = msg.info.origin.position.y + y * resolution
                 cmx = int((px - self.costmap.info.origin.position.x) / self.costmap.info.resolution)
                 cmy = int((py - self.costmap.info.origin.position.y) / self.costmap.info.resolution)
-                if (self.costmap.data[cmy * self.costmap.info.width + cmx] > 0): # Avoid near walls
+                costmap_index = cmy * self.costmap.info.width + cmx
+                if (costmap_index < 0 or costmap_index >= len(self.costmap.data) or self.costmap.data[costmap_index] >= 90): # Avoid near walls 100 is wall, 99 is inflated obstacle
                     continue
                 yaw = 0.0
                 poses.append((px, py, yaw))
