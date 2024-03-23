@@ -3,7 +3,10 @@ from rclpy.node import Node
 
 from nav_msgs.msg import OccupancyGrid
 from math import atan2, asin
-from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped, TransformStamped, Transform
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 
 class Guidance(Node):
@@ -11,21 +14,28 @@ class Guidance(Node):
         super().__init__('cbt_guidance')
         self.cost_subscription = self.create_subscription(OccupancyGrid, '/global_costmap/costmap', self.costmap_callback, 10)
         self.map_subscription = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
-        self.pose_subscription = self.create_subscription(PoseWithCovarianceStamped, '/pose', self.pose_callback, 10)
         self.publisher = self.create_publisher(PoseStamped, 'goal_pose', 10)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.map = OccupancyGrid()
-        self.pose = Pose()
+        self.transform = Transform()
         self.last_goal = (0.0, 0.0, 0.0)
         self.costmap = OccupancyGrid()
-
-    def pose_callback(self, msg):
-        self.pose = msg.pose.pose
 
     def costmap_callback(self, msg):
         self.costmap = msg
 
     def map_callback(self, msg):
         self.map = msg
+        # Get current pose from tf2
+        try:
+            self.transform = self.tf_buffer.lookup_transform(
+                'base_link',
+                'map',
+                rclpy.time.Time()).transform
+        except TransformException as ex:
+            self.get_logger().warning(f'Could not get base_link transform: {ex}')
+            return
 
         x, y, yaw = self.pickPose(msg)
 
@@ -34,7 +44,7 @@ class Guidance(Node):
         goal_pose.header.frame_id = 'map'
         goal_pose.pose.position.x = x
         goal_pose.pose.position.y = y
-        goal_pose.pose.orientation = self.pose.orientation
+        goal_pose.pose.orientation = self.transform.rotation
 
         self.get_logger().info(str(goal_pose))
         # -1 is unknown, 0 is clear, 100 is wall
@@ -69,15 +79,15 @@ class Guidance(Node):
                 poses.append((px, py, yaw))
         if (len(poses) == 0):  # Mapping done
             return (0, 0, 0)  # Return to origin
-        best_cost = ((poses[0][0] - self.last_goal[0]) ** 2 + (poses[0][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x))
+        best_cost = ((poses[0][0] - self.last_goal[0]) ** 2 + (poses[0][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.transform.rotation.z) - atan2(poses[0][1] - self.transform.translation.y, poses[0][0] - self.transform.translation.x))
         while len(poses) > 1:
-            cost = ((poses[1][0] - self.last_goal[0]) ** 2 + (poses[1][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.pose.orientation.z) - atan2(poses[1][1] - self.pose.position.y, poses[1][0] - self.pose.position.x))
+            cost = ((poses[1][0] - self.last_goal[0]) ** 2 + (poses[1][1] - self.last_goal[1]) ** 2) * abs(2*asin(self.transform.rotation.z) - atan2(poses[1][1] - self.transform.translation.y, poses[1][0] - self.transform.translation.x))
             if cost < best_cost:
                 best_cost = cost
                 poses.pop(0)
             else:
                 poses.pop(1)
-        self.get_logger().info(f'\nPose angle: {2*asin(self.pose.orientation.z)}\nPoint angle: {atan2(poses[0][1] - self.pose.position.y, poses[0][0] - self.pose.position.x)}')
+        self.get_logger().info(f'\nPose angle: {2*asin(self.transform.rotation.z)}\nPoint angle: {atan2(poses[0][1] - self.transform.translation.y, poses[0][0] - self.transform.translation.x)}')
         self.last_goal = poses[0]
         return self.last_goal
 
