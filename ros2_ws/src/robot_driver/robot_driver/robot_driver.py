@@ -149,7 +149,7 @@ class RobotDriver(Node):
         elapsed = now - self.then
         elapsed = elapsed.nanoseconds / 1000000000
         self.then = now
-        self.get_logger().info(f'Running at {1/elapsed} Hz\nLeft Velocity: {self.leftMotor.velocity}\nRight Velocity: {self.rightMotor.velocity}')
+        self.get_logger().debug(f'Running at {1/elapsed} Hz\nLeft Velocity: {self.leftMotor.velocity}\nRight Velocity: {self.rightMotor.velocity}')
         return elapsed, now
 
     def publish_odometry(self, now):

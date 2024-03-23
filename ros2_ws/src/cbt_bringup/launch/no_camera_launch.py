@@ -31,9 +31,8 @@ def generate_launch_description():
     slam = Node(package="slam_toolbox", executable="sync_slam_toolbox_node", parameters=[ {"base_frame": "base_link", "max_laser_range": 5.0}])
 
     foxglove = Node(package="foxglove_bridge", executable="foxglove_bridge")
-    camera = Node(package="camera_driver", executable="camera_driver")
     cbt_guidance = Node(package="cbt_guidance", executable="cbt_guidance")
 
-    return LaunchDescription([foxglove, cbt_guidance, lidar_transform, lidar, nav2, slam, robot_driver, camera])
+    return LaunchDescription([foxglove, cbt_guidance, lidar_transform, lidar, nav2, slam, robot_driver])
 
 

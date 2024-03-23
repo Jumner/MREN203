@@ -8,10 +8,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    nav2 = IncludeLaunchDescription(
-          PythonLaunchDescriptionSource([os.path.join(
-               get_package_share_directory('nav2_bringup'), 'launch'), '/navigation_launch.py'])
-    )
     lidar = Node(
          package='sllidar_ros2',
          executable='sllidar_node',
@@ -28,12 +24,10 @@ def generate_launch_description():
 
     robot_driver = Node(package='robot_driver', executable='robot_driver')
 
-    slam = Node(package="slam_toolbox", executable="sync_slam_toolbox_node", parameters=[ {"base_frame": "base_link", "max_laser_range": 5.0}])
 
     foxglove = Node(package="foxglove_bridge", executable="foxglove_bridge")
     camera = Node(package="camera_driver", executable="camera_driver")
-    cbt_guidance = Node(package="cbt_guidance", executable="cbt_guidance")
 
-    return LaunchDescription([foxglove, lidar_transform, lidar, nav2, slam, robot_driver, camera])
+    return LaunchDescription([foxglove, lidar_transform, lidar, robot_driver, camera])
 
 
