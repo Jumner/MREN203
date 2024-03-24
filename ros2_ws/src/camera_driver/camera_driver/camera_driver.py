@@ -14,7 +14,7 @@
 
 import rclpy
 import numpy as np
-from math import asin, atan2
+from math import asin, atan2, hypot
 from rclpy.node import Node
 import cv2
 from cv_bridge import CvBridge
@@ -44,7 +44,7 @@ class CameraDriver(Node):
         self.pose_x = 0
         self.pose_y = 0
         self.pose_theta = 0
-        self.max_radius_squared = 3.0 ** 2
+        self.max_radius = 3.0
         self.angle_threshhold = np.pi/6.0
 
     def timer_callback(self):
@@ -93,23 +93,23 @@ class CameraDriver(Node):
         # Gather target coordinates
         target_x = point[0]
         target_y = point[1]
-        # Gather pose data
+        # Gather robot pose coordinates
         robot_x = pose[1]
         robot_y = pose[2]
-        distance = (target_x - robot_x) ** 2 + (target_y - robot_y) ** 2
-        # If the point is outside the maximum radius
-        if distance > self.max_radius_squared:
+        # Get distance of point from robot
+        distance = hypot(target_x - robota_x, target_y - robot_y)
+        # Exclude if the point is outside the maximum radius
+        if distance > self.max_radius:
             return False
-
         # Compute angle between input coordinate and pose
         robot_theta = pose[3]
         angle = atan2(target_y - robot_y, target_x - robot_x)
         # Compute the difference between pose_theta and angle
         angle_difference = abs(robot_theta - angle)
-        # If the point is outside the FOV cone
+        # Exclude if the point is outside the FOV cone
         if angle_difference > self.angle_threshhold:
             return False
-
+        # Point is within 3m and within the FOV cone, it is seen
         return True
 
 def main(args=None):
