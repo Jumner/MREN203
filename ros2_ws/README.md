@@ -19,3 +19,7 @@ ros2 run tf2_ros static_transform_publisher "0.065" "0.05" "0" "0" "0" "1" "0" "
 ros2 run robot_driver robot_driver
 ros2 launch nav2_bringup navigation_launch.py
 ros2 run slam_toolbox sync_slam_toolbox_node --ros-args -p base_frame:=base_link --ros-args -p max_laser_range:=5.0
+# JK I made a launch file
+ros2 launch cbt_bringup cbt_launch.py
+rm -r rosbag_name && ros2 bag record -a -o rosbag_name
+ros2 run nav2_map_server map_saver_cli -f map_name

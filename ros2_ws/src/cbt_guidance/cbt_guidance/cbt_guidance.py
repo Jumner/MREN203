@@ -15,6 +15,7 @@ class Guidance(Node):
         self.cost_subscription = self.create_subscription(OccupancyGrid, '/global_costmap/costmap', self.costmap_callback, 10)
         self.map_subscription = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         self.publisher = self.create_publisher(PoseStamped, 'goal_pose', 10)
+        self.timer = self.create_timer(1.0, self.timer_callback)
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.map = OccupancyGrid()
@@ -27,6 +28,8 @@ class Guidance(Node):
 
     def map_callback(self, msg):
         self.map = msg
+
+    def timer_callback(self):
         # Get current pose from tf2
         try:
             self.transform = self.tf_buffer.lookup_transform(
@@ -37,7 +40,7 @@ class Guidance(Node):
             self.get_logger().warning(f'Could not get base_link transform: {ex}')
             return
 
-        x, y, yaw = self.pickPose(msg)
+        x, y, yaw = self.pickPose(self.map)
 
         goal_pose = PoseStamped()
         goal_pose.header.stamp = self.get_clock().now().to_msg()
@@ -49,8 +52,9 @@ class Guidance(Node):
         # -1 is unknown, 0 is clear, 100 is wall
         self.publisher.publish(goal_pose)
 
+
     def pickPose(self, map):
-        pose = (0, 0, 0) # Default to home
+        pose = (0.0, 0.0, 0.0) # Default to home
         resolution = map.info.resolution
         width = map.info.width
         height = map.info.height
@@ -73,13 +77,14 @@ class Guidance(Node):
                     continue  # Avoid near walls 100 is wall, 99 is inflated obstacle
                 
                 
-                if hypot(px - self.transform.translation.x, py - self.transform.translation.y) < 0.5:
+                robot_dist = hypot(px - self.transform.translation.x, py - self.transform.translation.y)
+                if robot_dist < 0.5:
                     continue  # Don't get too close
 
                 # Point is valid, select best cost
                 dist = hypot(px - self.last_goal[0], py - self.last_goal[1])
                 angle_diff = abs(2*asin(self.transform.rotation.z) - atan2(py - self.transform.translation.y, px - self.transform.translation.x))
-                cost = dist * angle_diff
+                cost = (robot_dist + dist) * angle_diff
                 if cost < best_cost:
                     best_cost = cost
                     pose = (px, py, 0)
