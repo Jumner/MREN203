@@ -21,8 +21,12 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 import pathlib
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped
-from geometry_msgs.msg import Point, PointStamped
+from geometry_msgs.msg import Point, PointStamped, Transform, TransformStamped
 from std_msgs.msg import String
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+import os
 
 class CameraDriver(Node):
     def __init__(self):
@@ -31,13 +35,14 @@ class CameraDriver(Node):
         self.bridge = CvBridge()
 
         self.cap = cv2.VideoCapture(0)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        timer_period = 1 # seconds
-        self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.pose_subscription = self.create_subscription(PoseWithCovarianceStamped, 'pose',self.pose_callback,10)
+        self.fps = 10
+        self.timer = self.create_timer(1/self.fps, self.timer_callback)
         self.point_subscription = self.create_subscription(PointStamped, 'target_point', self.target_callback,10)
 
-        self.pose = Pose()
+        self.transform = Transform()
         self.pose_array = []
         self.frame_count = 0
 
@@ -52,19 +57,24 @@ class CameraDriver(Node):
         if frame is None:
             self.get_logger().warning("failed to read frame")
             return
-            
-        frame = cv2.flip(frame, 1)
+        # Get current pose from tf2
+        try:
+            self.transform = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time()).transform
+        except TransformException as ex:
+            self.get_logger().warning(f'Could not get base_link transform: {ex}')
+            return
+
         image_name = f'images/{self.frame_count}.jpg'
-        self.get_logger().info(f'Logging frame: {image_name}')
-        # cv2.imwrite(image_name, frame) TODO uncomment but rip storage
-        # TODO add the transform stuff here to set self.pose
+        # self.get_logger().info(f'Logging frame: {image_name}')
+        cv2.imwrite('/images/{self.frame_count}.jpg', frame) # RIP Storage
+        self.get_logger().info(f'Logged frame: {image_name}')
 
         # Gather all required pose data
-        self.pose_x = self.pose.position.x
-        self.pose_y = self.pose.position.y
+        self.pose_x = self.transform.translation.x
+        self.pose_y = self.transform.translation.y
         
         # Retrieve Yaw
-        self.pose_theta = 2*asin(self.pose.orientation.z)
+        self.pose_theta = 2*asin(self.transform.rotation.z)
 
         # Put frame in array
         self.pose_array.append((image_name, self.pose_x, self.pose_y, self.pose_theta))
@@ -74,12 +84,6 @@ class CameraDriver(Node):
         self.publisher_.publish(img_msg)
         self.frame_count += 1
 
-    def pose_callback(self, pose_msg): # Activates whenever a pose is recieved
-        self.pose = pose_msg.pose.pose
-        self.get_logger().info(f'Recieved Pose: {str(self.pose)}')
-        # TODO use tf2_ros to query the base_link to map transform to get the current pose at every point
-        # You will need to remove this callback, as the transforms get updated automatically.
-
     def target_callback(self, target_point):
         target_point = target_point.point
         self.get_logger().info(str(self.pose_array))
@@ -87,7 +91,34 @@ class CameraDriver(Node):
         target_point = [target_point.x, target_point.y]
         filtered_array = list(map(lambda pose: pose[0], filter(lambda pose: self.is_seen(target_point, pose), self.pose_array)))
         self.get_logger().info(str(filtered_array))
-        # TODO turn filtered_array into video
+
+        # Turn filtered_array into video
+        output_video_filename = 'images/output_video.mp4'
+        create_video_from_images(filtered_array, output_video_filename)
+
+    def create_video_from_images(filtered_array, output_video_filename, image_folder='images'):
+        # Define the path to the image folder
+        image_folder_path = os.path.join(os.getcwd(), image_folder)
+
+        # Get the dimensions of the first image
+        first_image = cv2.imread(os.path.join(image_folder_path, filtered_array[0]))
+        height, width, _ = first_image.shape
+
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_video_filename, fourcc, self.fps, (width, height))
+
+        # Iterate through the filtered array and write images to the video
+        for image_filename in filtered_array:
+            image_path = os.path.join(image_folder_path, image_filename)
+            if os.path.exists(image_path):
+                image = cv2.imread(image_path)
+                out.write(image)
+                self.get_logger().info(image_path)
+
+        # Release the VideoWriter object and close all windows
+        out.release()
+        cv2.destroyAllWindows()
 
     def is_seen(self, point, pose):
         # Gather target coordinates

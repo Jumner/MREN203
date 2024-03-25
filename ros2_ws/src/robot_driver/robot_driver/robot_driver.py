@@ -95,8 +95,8 @@ class RobotDriver(Node):
 
     def cmd_vel_callback(self, msg):
         if (self.halt):
-            self.leftMotor.target = 0
-            self.rightMotor.target = 0
+            self.leftMotor.target = 0.25
+            self.rightMotor.target = -0.25
         else:
             linear = max(min(msg.linear.x, 0.25), -0.25)
             delta = max(min(msg.angular.z, 0.5), -0.5) * self.width / 2
@@ -120,12 +120,12 @@ class RobotDriver(Node):
         elapsed, now = self.cycle_setup()
         # Handle prox
         prox_0, prox_1 = int(prox_0), int(prox_1)
-        #if(prox_0>400 or prox_1>400):
-        #    self.halt = True
-        #    self.leftMotor.target = 0
-        #    self.rightMotor.target = 0
-        #else:
-        #    self.halt = False
+        if(prox_0>400 or prox_1>400):
+           self.halt = True
+           self.leftMotor.target = 0
+           self.rightMotor.target = 0
+        else:
+           self.halt = False
         left_ticks, right_ticks = int(left_ticks), int(right_ticks)
 
         # PID
