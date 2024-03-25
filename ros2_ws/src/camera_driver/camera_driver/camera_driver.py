@@ -97,7 +97,7 @@ class CameraDriver(Node):
         robot_x = pose[1]
         robot_y = pose[2]
         # Get distance of point from robot
-        distance = hypot(target_x - robota_x, target_y - robot_y)
+        distance = hypot(target_x - robot_x, target_y - robot_y)
         # Exclude if the point is outside the maximum radius
         if distance > self.max_radius:
             return False
