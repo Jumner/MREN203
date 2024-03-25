@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<robot name="visual">
+
+  <material name="wheel">
+    <color rgba="0.5 0.5 0.5 1"/>
+  </material>
+  <material name="blue">
+    <color rgba="0 0 0 1"/>
+  </material>
+  <material name="black">
+    <color rgba="0.1 0.1 0.1 1"/>
+  </material>
+
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+	<box size="0.2525 0.2 0.06" />
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+  
+  <link name="back_left">
+    <visual>
+      <geometry>
+        <cylinder length="0.07" radius="0.06"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+  </link>
+  <joint name="back_left" type="fixed">
+    <parent link="base_link"/>
+    <child link="back_left" />
+    <origin rpy="1.57079632679 0 0" xyz="-0.1 -0.14 -0.015"/>
+  </joint>
+
+  <link name="back_right">
+    <visual>
+      <geometry>
+        <cylinder length="0.07" radius="0.06"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+  </link>
+  <joint name="back_right" type="fixed">
+    <parent link="base_link"/>
+    <child link="back_right" />
+    <origin rpy="1.57079632679 0 0" xyz="-0.1 0.14 -0.015"/>
+  </joint>
+
+  <link name="front_left">
+    <visual>
+      <geometry>
+        <cylinder length="0.07" radius="0.06"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+  </link>
+  <joint name="front_left" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_left" />
+    <origin rpy="1.57079632679 0 0" xyz="0.1 -0.14 -0.015"/>
+  </joint>
+
+  <link name="front_right">
+    <visual>
+      <geometry>
+        <cylinder length="0.07" radius="0.06"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+  </link>
+  <joint name="front_right" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_right" />
+    <origin rpy="1.57079632679 0 0" xyz="0.1 0.14 -0.015"/>
+  </joint>
+  
+  <link name="lidar">
+    <visual>
+      <geometry>
+        <cylinder length="0.025" radius="0.04"/>
+      </geometry>
+      <material name="gray"/>
+    </visual>
+  </link>
+  <joint name="lidar" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar" />
+    <origin xyz="0.065 0.05 0.09"/>
+  </joint>
+
+
+
+
+
+</robot>
