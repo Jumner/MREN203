@@ -121,9 +121,9 @@ class RobotDriver(Node):
         # Handle prox
         prox_0, prox_1 = int(prox_0), int(prox_1)
         if(prox_0>400 or prox_1>400):
-           self.halt = True
-           self.leftMotor.target = 0
-           self.rightMotor.target = 0
+           self.halt = False # TODO
+           #self.leftMotor.target = 0
+           #self.rightMotor.target = 0
         else:
            self.halt = False
         left_ticks, right_ticks = int(left_ticks), int(right_ticks)

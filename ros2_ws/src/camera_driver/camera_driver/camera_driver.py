@@ -38,7 +38,7 @@ class CameraDriver(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        self.fps = 10
+        self.fps = 5
         self.timer = self.create_timer(1/self.fps, self.timer_callback)
         self.point_subscription = self.create_subscription(PointStamped, 'target_point', self.target_callback,10)
 
@@ -49,7 +49,7 @@ class CameraDriver(Node):
         self.pose_x = 0
         self.pose_y = 0
         self.pose_theta = 0
-        self.max_radius = 3.0
+        self.max_radius = 8.0
         self.angle_threshhold = np.pi/6.0
 
     def timer_callback(self):
@@ -64,10 +64,10 @@ class CameraDriver(Node):
             self.get_logger().warning(f'Could not get base_link transform: {ex}')
             return
 
-        image_name = f'images/{self.frame_count}.jpg'
+        image_name = f'/home/CBT/MREN203/ros2_ws/src/camera_driver/camera_driver/images/{self.frame_count}.jpg'
         # self.get_logger().info(f'Logging frame: {image_name}')
-        cv2.imwrite('/images/{self.frame_count}.jpg', frame) # RIP Storage
-        self.get_logger().info(f'Logged frame: {image_name}')
+        cv2.imwrite(image_name, frame) # RIP Storage
+        self.get_logger().info(f'Logged frame: {self.frame_count}.jpg')
 
         # Gather all required pose data
         self.pose_x = self.transform.translation.x
@@ -93,15 +93,17 @@ class CameraDriver(Node):
         self.get_logger().info(str(filtered_array))
 
         # Turn filtered_array into video
-        output_video_filename = 'images/output_video.mp4'
-        create_video_from_images(filtered_array, output_video_filename)
+        output_video_filename = '/home/CBT/MREN203/output/output_video.mp4'
+        self.create_video_from_images(filtered_array, output_video_filename)
 
-    def create_video_from_images(filtered_array, output_video_filename, image_folder='images'):
+    def create_video_from_images(self, filtered_array, output_video_filename):
         # Define the path to the image folder
-        image_folder_path = os.path.join(os.getcwd(), image_folder)
 
         # Get the dimensions of the first image
-        first_image = cv2.imread(os.path.join(image_folder_path, filtered_array[0]))
+        if (len(filtered_array) < 1):
+            self.get_logger().warning("No images to create video of")
+            return
+        first_image = cv2.imread(filtered_array[0])
         height, width, _ = first_image.shape
 
         # Define the codec and create VideoWriter object
@@ -110,15 +112,14 @@ class CameraDriver(Node):
 
         # Iterate through the filtered array and write images to the video
         for image_filename in filtered_array:
-            image_path = os.path.join(image_folder_path, image_filename)
-            if os.path.exists(image_path):
-                image = cv2.imread(image_path)
+            if os.path.exists(image_filename):
+                image = cv2.imread(image_filename)
                 out.write(image)
-                self.get_logger().info(image_path)
+                self.get_logger().info(image_filename)
 
         # Release the VideoWriter object and close all windows
         out.release()
-        cv2.destroyAllWindows()
+        self.get_logger().info("Outputed Video")
 
     def is_seen(self, point, pose):
         # Gather target coordinates
